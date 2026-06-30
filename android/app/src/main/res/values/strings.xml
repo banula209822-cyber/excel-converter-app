@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Bill Converter</string>
+    <string name="title_activity_main">Bill Converter</string>
+    <string name="package_name">com.billconverter.app</string>
+    <string name="custom_url_scheme">com.billconverter.app</string>
+</resources>
