@@ -102,30 +102,47 @@ export default function SummaryPage() {
     window.location.reload();
   };
 
-  const fetchSummaryData = async () => {
-    try {
-      const { data: items, error: itemsError } = await supabase
-        .from("bill_items")
-        .select(`*, bills ( created_at )`);
+ const fetchSummaryData = async () => {
+  try {
+    // 1. LocalStorage eken user ge role eka gannava
+    const currentRole = localStorage.getItem("app_user_role"); // 'admin' ho 'user'
 
-      if (itemsError) throw itemsError;
+    // 2. Supabase session eken දැනට log vela inna user ge email eka gannava
+    const { data: { session } } = await supabase.auth.getSession();
+    const currentUserEmail = session?.user?.email;
 
-      if (items) {
-        setItemsList(items);
-        setFilteredItems(items);
-        calculateTotal(items);
+    // 3. Base Query eka hadagannava (Ube parana select kalla meke thiyenava)
+    let query = supabase
+      .from("bill_items")
+      .select(`*, bills ( created_at, email )`); // Methanata email kallath ekathu kala filter karanna lesi venna
 
-        const dates = items.map((item: any) => {
-          if (!item.bills?.created_at) return null;
-          return new Date(item.bills.created_at).toLocaleDateString();
-        }).filter((date, index, self) => date !== null && self.indexOf(date) === index);
-        
-        setAvailableDates(dates as string[]);
-      }
-    } catch (error) {
-      console.error(error);
+    // 4. 🚨 MEKA THAMYI ADMIN LOGIC EKA!
+    // Log vela inna kkena ADMIN nemei nam, eyage email ekata adala bills vitharak filter karanava
+    if (currentRole !== "admin" && currentUserEmail) {
+      query = query.eq("bills.email", currentUserEmail);
     }
-  };
+
+    const { data: items, error: itemsError } = await query;
+
+    if (itemsError) throw itemsError;
+
+    if (items) {
+      // 5. Methanin pahuva ube parana states set vana logic tika elatama veda
+      setItemsList(items);
+      setFilteredItems(items);
+      calculateTotal(items);
+
+      const dates = items.map((item: any) => {
+        if (!item.bills?.created_at) return null;
+        return new Date(item.bills.created_at).toLocaleDateString();
+      }).filter((date, index, self) => date !== null && self.indexOf(date) === index);
+
+      setAvailableDates(dates as string[]);
+    }
+  } catch (error) {
+    console.error(error);
+  }
+};
 
   useEffect(() => {
     if (sessionUser) {

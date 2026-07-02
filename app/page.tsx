@@ -4,11 +4,11 @@ import { useState, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { supabase } from "@/lib/supabase";
 import Link from "next/link";
-import { convertImageToData } from "./actions/convert"; // උඹේ පරණ import එක
+import { convertImageToData } from "./actions/convert";
 
 export default function Home() {
   // ==========================================
-  // ✨ 1. උඹේ පරණ UI එකේ තිබ්බ ORIGINAL STATES (සුරැකිව ඇත)
+  // ✨ 1. ORIGINAL UI STATES
   // ==========================================
   const [loading, setLoading] = useState(false);
   const [extractedData, setExtractedData] = useState<any[] | null>(null);
@@ -36,12 +36,15 @@ export default function Home() {
           localStorage.setItem("app_user_role", "user");
         } else {
           const localAdmin = localStorage.getItem("admin_session");
-          if (localAdmin) setSessionUser(JSON.parse(localAdmin));
+          if (localAdmin) {
+            setSessionUser(JSON.parse(localAdmin));
+            localStorage.setItem("app_user_role", "admin");
+          }
         }
       } catch (e) {
         console.error(e);
       } finally {
-        setCheckingAuth(false);
+        setTimeout(() => setCheckingAuth(false), 800);
       }
     }
     syncAuth();
@@ -95,7 +98,7 @@ export default function Home() {
   };
 
   // ==========================================
-  // 📥 3. උඹේ පරණ DOCUMENT LOGIC FUNCTIONS
+  // 📥 3. DOCUMENT LOGIC & DATA EXTRACTION ENGINE
   // ==========================================
   const handleFileChange = (file: File) => {
     setSelectedFile(file);
@@ -106,11 +109,96 @@ export default function Home() {
 
   const triggerFileSelect = () => fileInputRef.current?.click();
 
+  // 🚨 🛠️ FIXED: TypeScript Compatibility & FormData Conversion
+  const handleExtractStructure = async () => {
+    if (!selectedFile) return;
+    setLoading(true);
+
+    try {
+      // 1. Server Action එකට ඕනෙ වෙන විදිහට FormData එකක් හදනවා
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+
+      // Server Action එකට FormData එක පාස් කරනවා
+      const aiResponse: any = await convertImageToData(formData);
+      
+      // 2. Response එක ආවද සහ ඒක ඇතුළේ data/items තියෙනවද කියලා check කරනවා
+      let itemsList: any[] = [];
+      let totalAmount = 0;
+
+      if (aiResponse && aiResponse.success && aiResponse.data) {
+        itemsList = aiResponse.data.items || [];
+        totalAmount = aiResponse.data.total || 0;
+      } else if (aiResponse && aiResponse.items) {
+        itemsList = aiResponse.items || [];
+        totalAmount = aiResponse.total || 0;
+      } else {
+        throw new Error("AI Extraction engine returned empty matrix structured dataset.");
+      }
+
+      setExtractedData(itemsList);
+
+      // 3. User Session ID එක ගන්නවා
+      const { data: { session } } = await supabase.auth.getSession();
+      const currentUserId = session?.user?.id || null;
+
+      // 4. Supabase 'bills' ටේබල් එකට insert කරනවා
+      const { data: billData, error: billError } = await supabase
+        .from("bills")
+        .insert([
+          {
+            total_amount: totalAmount,
+            user_id: currentUserId
+          }
+        ])
+        .select();
+
+      if (billError) throw billError;
+
+      const insertedBillId = billData[0]?.id;
+
+      // 5. Items ටික 'bill_items' ටේබල් එකට insert කරනවා
+      if (insertedBillId && itemsList.length > 0) {
+        const itemsToInsert = itemsList.map((item: any) => ({
+          bill_id: insertedBillId,
+          name: item.name || "Unknown Product",
+          price: parseFloat(item.price) || 0,
+          quantity: parseInt(item.quantity) || 1
+        }));
+
+        const { error: itemsError } = await supabase.from("bill_items").insert(itemsToInsert);
+        if (itemsError) throw itemsError;
+      }
+
+      alert("Handshake Success! Data structure synchronized and stored into Ledger database.");
+
+    } catch (error: any) {
+      console.error(error);
+      alert(error.message || "Extraction Gateway node failure.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 🔄 4. 🔐 BRAND NEW LOADING HANDSHAKE SCREEN
   if (checkingAuth) {
-    return <div className="min-h-screen bg-slate-950 text-slate-500 flex items-center justify-center font-mono">Loading Ecosystem Gateway...</div>;
+    return (
+      <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 antialiased">
+        <div className="max-w-sm w-full text-center space-y-4">
+          <div className="relative mx-auto h-12 w-12 flex items-center justify-center">
+            <div className="absolute inset-0 rounded-full border-2 border-cyan-500/20 animate-ping"></div>
+            <div className="h-8 w-8 rounded-full border-t-2 border-b-2 border-cyan-400 animate-spin"></div>
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-sm font-bold tracking-wider text-cyan-400 uppercase">Synchronizing Node...</h2>
+            <p className="text-[11px] text-slate-500 font-mono">Verifying authorization handshake, please wait.</p>
+          </div>
+        </div>
+      </main>
+    );
   }
 
-  // 🔒 ලොග් වෙලා නැත්නම් පේන PROFESSIONAL GATEWAY එක
+  // 🔒 SYSTEM GATEWAY (LOGIN)
   if (!sessionUser) {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 antialiased">
@@ -151,7 +239,7 @@ export default function Home() {
   }
 
   // ==========================================
-  // 🔓 4. ලොග් වුණාම විතරක් පේන උඹේ ORIGINAL UI එක (ගින්දර වගේ වැඩ!)
+  // 🔓 5. MAIN APPLICATION INTERFACE
   // ==========================================
   return (
     <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 antialiased">
@@ -181,7 +269,7 @@ export default function Home() {
           </p>
         </div>
 
-        {/* 📥 ORIGINAL DRAG & DROP BOX (උඹේ පරණ ලස්සනම UI එක) */}
+        {/* DRAG & DROP BOX */}
         <div 
           onClick={triggerFileSelect}
           className={`border-2 border-dashed rounded-2xl p-8 text-center cursor-pointer transition-all duration-200 ${
@@ -214,6 +302,7 @@ export default function Home() {
 
         {/* Process Action Button */}
         <button 
+          onClick={handleExtractStructure}
           disabled={!selectedFile || loading}
           className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 disabled:from-slate-900 disabled:to-slate-900 text-black disabled:text-slate-600 font-black py-3.5 rounded-xl transition text-xs uppercase tracking-wider shadow-lg shadow-cyan-500/5"
         >
