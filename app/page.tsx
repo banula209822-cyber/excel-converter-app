@@ -109,20 +109,16 @@ export default function Home() {
 
   const triggerFileSelect = () => fileInputRef.current?.click();
 
-  // 🚨 🛠️ FIXED: TypeScript Compatibility & FormData Conversion
   const handleExtractStructure = async () => {
     if (!selectedFile) return;
     setLoading(true);
 
     try {
-      // 1. Server Action එකට ඕනෙ වෙන විදිහට FormData එකක් හදනවා
       const formData = new FormData();
       formData.append("file", selectedFile);
 
-      // Server Action එකට FormData එක පාස් කරනවා
       const aiResponse: any = await convertImageToData(formData);
       
-      // 2. Response එක ආවද සහ ඒක ඇතුළේ data/items තියෙනවද කියලා check කරනවා
       let itemsList: any[] = [];
       let totalAmount = 0;
 
@@ -138,11 +134,9 @@ export default function Home() {
 
       setExtractedData(itemsList);
 
-      // 3. User Session ID එක ගන්නවා
       const { data: { session } } = await supabase.auth.getSession();
       const currentUserId = session?.user?.id || null;
 
-      // 4. Supabase 'bills' ටේබල් එකට insert කරනවා
       const { data: billData, error: billError } = await supabase
         .from("bills")
         .insert([
@@ -157,7 +151,6 @@ export default function Home() {
 
       const insertedBillId = billData[0]?.id;
 
-      // 5. Items ටික 'bill_items' ටේබල් එකට insert කරනවා
       if (insertedBillId && itemsList.length > 0) {
         const itemsToInsert = itemsList.map((item: any) => ({
           bill_id: insertedBillId,
@@ -180,7 +173,7 @@ export default function Home() {
     }
   };
 
-  // 🔄 4. 🔐 BRAND NEW LOADING HANDSHAKE SCREEN
+  // 🔄 4. BRAND NEW LOADING HANDSHAKE SCREEN
   if (checkingAuth) {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 antialiased">
@@ -198,7 +191,7 @@ export default function Home() {
     );
   }
 
-  // 🔒 SYSTEM GATEWAY (LOGIN)
+  // 🔒 SYSTEM GATEWAY (LOGIN) - Placeholders updated to simple standard
   if (!sessionUser) {
     return (
       <main className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-4 antialiased">
@@ -215,12 +208,12 @@ export default function Home() {
 
           <form onSubmit={(e) => { e.preventDefault(); isSignUp ? handleSignUp() : handleLoginSubmit(e); }} className="space-y-4">
             <div>
-              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Gmail / Admin Identifier</label>
-              <input type="text" placeholder={isSignUp ? "yourname@gmail.com" : "user@gmail.com OR admin@"} value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm outline-none text-slate-200" required />
+              <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Email</label>
+              <input type="text" placeholder="Enter your Email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm outline-none text-slate-200" required />
             </div>
             <div>
               <label className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Password</label>
-              <input type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm outline-none text-slate-200" required />
+              <input type="password" placeholder="Enter your password" value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2.5 text-sm outline-none text-slate-200" required />
             </div>
 
             {isSignUp && (
